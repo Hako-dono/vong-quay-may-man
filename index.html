@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vòng Quay May Mắn — 20/10 BSM</title>
+<style>
+  :root {
+    --red: #c1272d;
+    --red-dark: #8f1b20;
+    --gold: #f0b429;
+    --cream: #fff3e0;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+    background: #000;
+  }
+
+  body {
+    background-image: url('assets/background.png');
+    background-size: cover;
+    background-position: center;
+  }
+
+  .overlay-tint {
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(ellipse at center, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0.6) 100%);
+    z-index: 0;
+  }
+
+  .stage {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    padding: 20px;
+  }
+
+  .panel {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 18px;
+    padding: 36px 70px 44px;
+    border-radius: 48px;
+    background: radial-gradient(ellipse at center, rgba(55,8,10,0.55) 0%, rgba(20,3,4,0.42) 100%);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(255,255,255,0.08);
+  }
+
+  .title {
+    text-align: center;
+    color: #fff;
+    text-shadow: 0 2px 10px rgba(0,0,0,0.6);
+  }
+  .title h1 {
+    margin: 0;
+    font-size: 42px;
+    letter-spacing: 1px;
+    color: var(--gold);
+  }
+  .title p {
+    margin: 4px 0 0;
+    font-size: 18px;
+    color: #fff3e0;
+  }
+
+  .wheel-wrap {
+    position: relative;
+    width: min(56vh, 560px);
+    height: min(56vh, 560px);
+  }
+
+  .pointer {
+    position: absolute;
+    top: -16px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 20px solid transparent;
+    border-right: 20px solid transparent;
+    border-top: 34px solid var(--red-dark);
+    z-index: 3;
+    filter: drop-shadow(0 3px 4px rgba(0,0,0,0.5));
+  }
+
+  .wheel-ring {
+    position: absolute;
+    inset: -10px;
+    border-radius: 50%;
+    background: conic-gradient(from 0deg, var(--gold), #fff, var(--gold), #fff, var(--gold), #fff, var(--gold), #fff, var(--gold), #fff);
+    box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+  }
+
+  #wheel {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    width: calc(100% - 20px);
+    height: calc(100% - 20px);
+    border-radius: 50%;
+    will-change: transform;
+    box-shadow: inset 0 0 0 6px rgba(255,255,255,0.85);
+  }
+
+  .hub {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 22%;
+    height: 22%;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #ffdd7a, var(--gold) 55%, #c98a0f 100%);
+    border: 4px solid #fff;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.45);
+    z-index: 4;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-weight: 800;
+    color: var(--red-dark);
+    font-size: clamp(14px, 2.2vh, 20px);
+    user-select: none;
+    transition: transform 0.15s ease;
+  }
+  .hub:active { transform: translate(-50%, -50%) scale(0.94); }
+  .hub.disabled { cursor: not-allowed; opacity: 0.6; }
+
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    color: #fff;
+    background: rgba(0,0,0,0.35);
+    padding: 10px 20px;
+    border-radius: 999px;
+    backdrop-filter: blur(4px);
+    font-size: 15px;
+  }
+  .controls .count { font-weight: 600; color: var(--gold); }
+
+  .hint {
+    color: rgba(255,255,255,0.75);
+    font-size: 13px;
+  }
+
+  /* Winner modal */
+  .modal {
+    position: fixed;
+    inset: 0;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0,0,0,0);
+    pointer-events: none;
+    transition: background 0.35s ease;
+  }
+  .modal.show {
+    background: rgba(0,0,0,0.65);
+    pointer-events: auto;
+  }
+  .modal-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    opacity: 0;
+  }
+  .modal.show .modal-card {
+    opacity: 1;
+  }
+  .modal.show .modal-card.pop-in {
+    animation: popIn 0.75s cubic-bezier(.22,1.1,.3,1) forwards;
+  }
+
+  @keyframes popIn {
+    0%   { transform: scale(0.15) rotate(-20deg); opacity: 0; }
+    50%  { transform: scale(1.18) rotate(7deg);   opacity: 1; }
+    72%  { transform: scale(0.94) rotate(-4deg); }
+    88%  { transform: scale(1.04) rotate(2deg); }
+    100% { transform: scale(1) rotate(0deg); }
+  }
+
+  .winner-burst {
+    position: absolute;
+    top: 48%;
+    left: 50%;
+    width: 64vh;
+    height: 64vh;
+    transform: translate(-50%, -50%) scale(0.2);
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,224,140,0.65) 0%, rgba(240,180,41,0.3) 38%, rgba(240,180,41,0) 70%);
+    pointer-events: none;
+    z-index: -1;
+    opacity: 0;
+  }
+  .modal.show .winner-burst.burst-play {
+    animation: burstRing 1.2s ease-out forwards;
+  }
+  @keyframes burstRing {
+    0%   { transform: translate(-50%, -50%) scale(0.15); opacity: 0.95; }
+    60%  { opacity: 0.45; }
+    100% { transform: translate(-50%, -50%) scale(1.5); opacity: 0; }
+  }
+
+  .modal-card img {
+    max-height: 56vh;
+    max-width: 70vw;
+    filter: drop-shadow(0 0 40px rgba(255,210,122,0.55)) drop-shadow(0 18px 24px rgba(0,0,0,0.55));
+  }
+  .modal-card img.idle-float {
+    animation: idleFloat 3.4s ease-in-out infinite;
+  }
+  @keyframes idleFloat {
+    0%, 100% { transform: translateY(0) rotate(-1.6deg); }
+    50%      { transform: translateY(-16px) rotate(1.6deg); }
+  }
+
+  .winner-banner {
+    background: linear-gradient(90deg, var(--red), var(--red-dark));
+    color: #fff;
+    padding: 10px 32px;
+    border-radius: 999px;
+    font-size: 30px;
+    font-weight: 800;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.5);
+    text-align: center;
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  .modal.show .winner-banner.banner-in {
+    animation: bannerIn 0.5s ease-out 0.35s forwards;
+  }
+  @keyframes bannerIn {
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .modal-card button {
+    margin-top: 6px;
+    background: var(--gold);
+    color: var(--red-dark);
+    border: none;
+    padding: 10px 26px;
+    border-radius: 999px;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .modal-card button:hover { filter: brightness(1.08); }
+
+  .confetti {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 9;
+    overflow: hidden;
+  }
+  .confetti span {
+    position: absolute;
+    top: -20px;
+    width: 10px;
+    height: 16px;
+    opacity: 0.95;
+    animation: fall linear forwards;
+  }
+  @keyframes fall {
+    to {
+      transform: translateY(110vh) rotate(540deg);
+      opacity: 0.3;
+    }
+  }
+
+</style>
+</head>
+<body>
+
+<div class="overlay-tint"></div>
+
+<div class="stage">
+  <div class="panel">
+    <div class="title">
+      <h1>🎊 Vòng quay - anh chàng may mắn 🎊</h1>
+      <p>Chúc mừng Ngày Phụ nữ Việt Nam 20/10 — Rạng rỡ nụ cười</p>
+    </div>
+
+    <div class="wheel-wrap">
+      <div class="pointer"></div>
+      <div class="wheel-ring"></div>
+      <canvas id="wheel" width="1000" height="1000"></canvas>
+      <div class="hub" id="hub">QUAY</div>
+    </div>
+
+    <div class="controls">
+      <span class="count">Còn lại: <span id="countLeft"></span>/<span id="countTotal"></span></span>
+    </div>
+
+    <div class="hint" id="hintText">Nhấn vào bánh xe hoặc phím <b>Space</b> để quay</div>
+  </div>
+</div>
+
+<div class="modal" id="modal">
+  <div class="modal-card" id="modalCard">
+    <div class="winner-burst" id="winnerBurst"></div>
+    <img id="winnerSticker" src="" alt="">
+    <div class="winner-banner" id="winnerName"></div>
+    <button id="continueBtn">Tiếp tục quay 🎉</button>
+  </div>
+</div>
+
+<div class="confetti" id="confetti"></div>
+
+<script>
+const PARTICIPANTS = [
+  { name: "Bình Bé Bỏng",   file: "Bình Bé Bỏng.png" },
+  { name: "Lâm Lém Lỉnh",   file: "Lâm Lém Lỉnh.png" },
+  { name: "Dũng Đảm Đang",  file: "Dũng Đảm Đang.png" },
+  { name: "Hào Hóng Hớt",   file: "Hào Hóng Hớt.png" },
+  { name: "Quân Quằn Quại", file: "Quân Quằn Quại.png" },
+  { name: "NA Núng Nính",   file: "NA Núng nính.png" },
+  { name: "Đức Đẫy Đà",     file: "Đức Đẫy Đà.png" },
+  { name: "Sơn Sung Sướng", file: "Sơn Sung Sướng.png" },
+  { name: "Công Cao Cả",    file: "Công Cao Cả.png" },
+  { name: "Minh Mát Mẻ",    file: "Minh Mát Mẻ.png" },
+  { name: "Hà Hóm Hỉnh",    file: "Hà Hóm Hỉnh.png" },
+  { name: "Điệp Đon Đả",    file: "Điệp Đon Đả.png" },
+  { name: "Hưng Hớn Hở",    file: "Hưng Hớn Hở.png" },
+  { name: "Lâm Lực Lưỡng",  file: "Lâm Lực Lưỡng.png" },
+];
+
+const COLORS = [
+  "#c1272d", "#f0b429", "#8f1b20", "#ffd27a",
+  "#a8161b", "#f5c94f", "#7a1317", "#ffe3a3",
+  "#d63a2f", "#f7d36b", "#b5121c", "#eec05a",
+  "#931a1f", "#ffdb8a"
+];
+
+const canvas = document.getElementById('wheel');
+const ctx = canvas.getContext('2d');
+const hub = document.getElementById('hub');
+const modal = document.getElementById('modal');
+const winnerSticker = document.getElementById('winnerSticker');
+const winnerName = document.getElementById('winnerName');
+const modalCard = document.getElementById('modalCard');
+const winnerBurst = document.getElementById('winnerBurst');
+const continueBtn = document.getElementById('continueBtn');
+const countLeft = document.getElementById('countLeft');
+const countTotal = document.getElementById('countTotal');
+const hintText = document.getElementById('hintText');
+const confettiLayer = document.getElementById('confetti');
+const wheelWrap = document.querySelector('.wheel-wrap');
+
+const TOTAL = PARTICIPANTS.length;
+const SEG_DEG = 360 / TOTAL;
+
+// preload + decode sticker ngay từ lúc mở trang (chạy nền, không chặn
+// render) — trên mạng chậm (tunnel), 7.2s quay không đủ để tải+decode 1 ảnh
+// từ đầu, khiến màn hình "đứng hình" sau khi bánh xe dừng chờ ảnh tải.
+// Preload sớm nghĩa là lúc quay, ảnh thường đã có sẵn trong cache.
+//
+// QUAN TRỌNG: tải TUẦN TỰ từng ảnh một, không bắn 14 request song song —
+// tải song song hết sẽ chia nhỏ băng thông cho cả 14 ảnh, khiến đúng ảnh
+// sắp cần (lúc quay) lại chậm hơn so với tải riêng lẻ như trước.
+const stickerCache = new Map();
+function preloadSticker(file) {
+  if (stickerCache.has(file)) return stickerCache.get(file);
+  const src = `assets/stickers/${file}`;
+  const promise = (async () => {
+    const img = new Image();
+    img.src = src;
+    try {
+      await img.decode();
+    } catch (e) {
+      // ignore decode errors (ví dụ browser cũ không hỗ trợ); ảnh vẫn sẽ
+      // được decode bình thường khi browser paint lần đầu
+    }
+    return src;
+  })();
+  stickerCache.set(file, promise);
+  return promise;
+}
+(async () => {
+  for (const p of PARTICIPANTS) {
+    await preloadSticker(p.file);
+  }
+})();
+
+let wonNames = new Set();
+let currentRotation = 0;
+let spinning = false;
+
+// ---- Sound effects ----
+// real audio clips cắt từ bài "BlackJack" (SOOBIN, Binz): đoạn 2:41-2:55 làm
+// nhạc nền (chạy lặp liên tục, chỉ reset khi bấm quay lần tiếp theo),
+// đoạn 2:11-2:40 làm âm thanh trúng thưởng lúc ra kết quả
+const SPIN_MUSIC_VOLUME = 0.55;
+
+const spinMusic = new Audio('assets/audio/spin-music.mp3');
+spinMusic.loop = true;
+spinMusic.volume = SPIN_MUSIC_VOLUME;
+spinMusic.preload = 'auto';
+
+const jackpotSound = new Audio('assets/audio/jackpot-hit.mp3');
+jackpotSound.volume = 0.5;
+jackpotSound.preload = 'auto';
+
+// nhạc dạo bắt đầu ngay khi mở trang; nếu bị chính sách autoplay của trình
+// duyệt chặn (chưa có tương tác), tự phát lại ngay ở cử chỉ đầu tiên của
+// người dùng (bấm/chạm/gõ phím bất kỳ, không riêng gì nút QUAY)
+function tryStartSpinMusic() {
+  if (spinMusic.paused) spinMusic.play().catch(() => {});
+}
+tryStartSpinMusic();
+['pointerdown', 'keydown'].forEach((evt) =>
+  document.addEventListener(evt, tryStartSpinMusic, { once: true })
+);
+
+let audioCtx = null;
+function ensureAudio() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (audioCtx.state === 'suspended') {
+    audioCtx.resume();
+  }
+  return audioCtx;
+}
+
+function playTick() {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = 'square';
+  osc.frequency.setValueAtTime(1500, t);
+  gain.gain.setValueAtTime(0.054, t);
+  gain.gain.exponentialRampToValueAtTime(0.001, t + 0.045);
+  osc.connect(gain).connect(audioCtx.destination);
+  osc.start(t);
+  osc.stop(t + 0.05);
+}
+
+function playWhoosh() {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = 'sawtooth';
+  osc.frequency.setValueAtTime(220, t);
+  osc.frequency.exponentialRampToValueAtTime(880, t + 0.35);
+  gain.gain.setValueAtTime(0.001, t);
+  gain.gain.exponentialRampToValueAtTime(0.12, t + 0.08);
+  gain.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
+  osc.connect(gain).connect(audioCtx.destination);
+  osc.start(t);
+  osc.stop(t + 0.42);
+}
+
+// tiếng "nổ hũ": đoạn drop thật của bài nhạc + chuỗi chuông vàng dồn dập
+// (coin cascade) bắn theo ngay sau cho cảm giác trúng thưởng đặc biệt hơn
+function playJackpot() {
+  jackpotSound.currentTime = 0;
+  jackpotSound.play().catch(() => {});
+
+  // tắt hoàn toàn nhạc dạo trong lúc âm báo trúng thưởng vang lên, trả lại
+  // âm lượng gốc ngay khi âm báo trúng thưởng kết thúc (hoặc ở spin() khi
+  // bấm quay lượt tiếp theo, xem bên dưới)
+  spinMusic.volume = 0;
+  jackpotSound.addEventListener('ended', () => {
+    spinMusic.volume = SPIN_MUSIC_VOLUME;
+  }, { once: true });
+
+  if (!audioCtx) return;
+  const t0 = audioCtx.currentTime + 0.04;
+  const notes = [987.77, 1174.66, 1318.51, 1567.98, 1864.66, 2093.0, 2349.32];
+  notes.forEach((freq, i) => {
+    const t = t0 + i * 0.055;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(freq, t);
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(0.066, t + 0.015);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.3);
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start(t);
+    osc.stop(t + 0.32);
+  });
+  const chordT = t0 + notes.length * 0.055 + 0.05;
+  [523.25, 659.25, 783.99, 1046.5].forEach((freq) => {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freq, chordT);
+    gain.gain.setValueAtTime(0.0001, chordT);
+    gain.gain.exponentialRampToValueAtTime(0.042, chordT + 0.04);
+    gain.gain.exponentialRampToValueAtTime(0.0001, chordT + 0.9);
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start(chordT);
+    osc.stop(chordT + 0.9);
+  });
+}
+
+// plays a "tick" every time the wheel's rotation crosses a new segment
+// boundary, so the clicking naturally speeds up/slows down with the spin
+function startSpinTicker() {
+  let lastAngleMod = null;
+  let traveled = 0;
+  let lastCrossed = 0;
+
+  function frame() {
+    if (!spinning) return;
+    const st = getComputedStyle(canvas);
+    const tm = st.transform;
+    let angleMod = 0;
+    if (tm && tm !== 'none') {
+      const m = tm.match(/matrix\(([^)]+)\)/);
+      if (m) {
+        const parts = m[1].split(',').map(Number);
+        angleMod = Math.atan2(parts[1], parts[0]) * 180 / Math.PI;
+        if (angleMod < 0) angleMod += 360;
+      }
+    }
+    if (lastAngleMod !== null) {
+      const delta = (angleMod - lastAngleMod + 360) % 360;
+      traveled += delta;
+    }
+    lastAngleMod = angleMod;
+
+    const crossed = Math.floor(traveled / SEG_DEG);
+    if (crossed > lastCrossed) {
+      lastCrossed = crossed;
+      playTick();
+    }
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+}
+
+function getRemainingPool() {
+  return PARTICIPANTS.filter(p => !wonNames.has(p.name));
+}
+
+function drawWheel() {
+  const size = canvas.width;
+  const cx = size / 2, cy = size / 2, r = size / 2;
+  ctx.clearRect(0, 0, size, size);
+
+  for (let i = 0; i < TOTAL; i++) {
+    const p = PARTICIPANTS[i];
+    const startAngle = (-90 + i * SEG_DEG) * Math.PI / 180;
+    const endAngle = (-90 + (i + 1) * SEG_DEG) * Math.PI / 180;
+
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, r, startAngle, endAngle);
+    ctx.closePath();
+    ctx.fillStyle = COLORS[i % COLORS.length];
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    // label
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(startAngle + (endAngle - startAngle) / 2);
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#fff';
+    // scale font down as the wedge gets narrower (more participants = tighter angle)
+    const fontSize = Math.max(16, size * 0.032 * Math.min(1, SEG_DEG / 36));
+    ctx.font = `700 ${fontSize}px 'Segoe UI', Arial, sans-serif`;
+    ctx.shadowColor = 'rgba(0,0,0,0.5)';
+    ctx.shadowBlur = 4;
+    ctx.fillText(p.name, r - 24, 0);
+    ctx.restore();
+  }
+
+  const remaining = getRemainingPool().length;
+  countLeft.textContent = String(remaining);
+
+  if (remaining === 0) {
+    hub.classList.add('disabled');
+    hub.textContent = 'HẾT';
+    hintText.textContent = `Đã quay hết ${TOTAL} người — tải lại trang để chơi vòng mới`;
+  } else {
+    hub.classList.remove('disabled');
+    hub.textContent = 'QUAY';
+    hintText.innerHTML = 'Nhấn vào bánh xe hoặc phím <b>Space</b> để quay';
+  }
+}
+
+function spin() {
+  if (spinning) return;
+  const pool = getRemainingPool();
+  if (pool.length === 0) return;
+  spinning = true;
+  hub.classList.add('disabled');
+
+  ensureAudio();
+  playWhoosh();
+  startSpinTicker();
+  jackpotSound.pause();
+  jackpotSound.currentTime = 0;
+  spinMusic.currentTime = 0;
+  spinMusic.volume = SPIN_MUSIC_VOLUME; // phòng trường hợp quay tiếp khi âm báo trúng thưởng (duck) chưa kết thúc
+  spinMusic.play().catch(() => {});
+
+  const winner = pool[Math.floor(Math.random() * pool.length)];
+  const fixedIdx = PARTICIPANTS.indexOf(winner);
+  const segCenter = fixedIdx * SEG_DEG + SEG_DEG / 2;
+
+  const margin = SEG_DEG * 0.18;
+  const jitter = (Math.random() * (SEG_DEG - margin * 2)) - (SEG_DEG / 2 - margin);
+  const targetMod = ((360 - (segCenter + jitter)) % 360 + 360) % 360;
+
+  const fullSpins = 6 + Math.floor(Math.random() * 3);
+  const current = ((currentRotation % 360) + 360) % 360;
+  let delta = targetMod - current;
+  if (delta < 0) delta += 360;
+
+  const finalRotation = currentRotation + fullSpins * 360 + delta;
+  currentRotation = finalRotation;
+
+  // ảnh đã được preload từ lúc mở trang (xem preloadSticker ở trên); gọi lại
+  // đây chỉ để lấy promise đã cache (nếu vì lý do gì chưa kịp preload, nó sẽ
+  // tự tải lại ngay — không chặn việc quay, chỉ chặn lúc hiện kết quả)
+  const imgReady = preloadSticker(winner.file);
+
+  canvas.style.transition = 'transform 7.2s cubic-bezier(0.12, 0.72, 0.1, 1)';
+  canvas.style.transform = `rotate(${finalRotation}deg)`;
+
+  const onEnd = async () => {
+    canvas.removeEventListener('transitionend', onEnd);
+    spinning = false;
+    const src = await imgReady;
+    await showWinner(winner, src);
+  };
+  canvas.addEventListener('transitionend', onEnd);
+}
+
+async function showWinner(winner, src) {
+  wonNames.add(winner.name);
+  drawWheel(); // refresh "Còn lại" counter right away, before modal opens
+  playJackpot();
+  winnerSticker.src = src;
+  winnerSticker.alt = winner.name;
+
+  // decode() ngay trên CHÍNH thẻ <img> đang hiển thị, rồi mới mở modal —
+  // trước đây chỉ decode trên 1 ảnh preload riêng (object Image() khác),
+  // nên dù đã "preload" xong, thẻ <img> thật vẫn có thể mất một nhịp để tự
+  // decode/paint nội dung mới, khiến ảnh cũ của lượt trước còn lưu lại
+  // (sticking) tới gần 1s trước khi ảnh mới thực sự hiện ra. decode() ở
+  // đây đảm bảo đúng pixel mới đã sẵn sàng paint trước khi modal lộ ra.
+  try {
+    await winnerSticker.decode();
+  } catch (e) {
+    // bỏ qua lỗi decode (vd. browser cũ không hỗ trợ); ảnh vẫn hiện bình
+    // thường ở lần paint kế tiếp
+  }
+
+  winnerName.textContent = `🎉 ${winner.name} 🎉`;
+
+  // reset animation classes so they replay on every spin
+  modalCard.classList.remove('pop-in');
+  winnerBurst.classList.remove('burst-play');
+  winnerName.classList.remove('banner-in');
+  winnerSticker.classList.remove('idle-float');
+  void modalCard.offsetWidth; // force reflow to restart CSS animations
+
+  modal.classList.add('show');
+  modalCard.classList.add('pop-in');
+  winnerBurst.classList.add('burst-play');
+  winnerName.classList.add('banner-in');
+
+  clearTimeout(showWinner._floatTimer);
+  showWinner._floatTimer = setTimeout(() => {
+    winnerSticker.classList.add('idle-float');
+  }, 750);
+
+  launchConfetti();
+}
+
+function closeModal() {
+  modal.classList.remove('show');
+  winnerSticker.classList.remove('idle-float');
+  clearTimeout(showWinner._floatTimer);
+  hub.classList.remove('disabled');
+  drawWheel();
+}
+
+function launchConfetti() {
+  const colors = ['#c1272d', '#f0b429', '#ffffff', '#ffd27a', '#8f1b20'];
+  for (let i = 0; i < 90; i++) {
+    const s = document.createElement('span');
+    s.style.left = Math.random() * 100 + 'vw';
+    s.style.background = colors[Math.floor(Math.random() * colors.length)];
+    s.style.animationDuration = (2.5 + Math.random() * 2) + 's';
+    s.style.animationDelay = (Math.random() * 0.6) + 's';
+    s.style.width = (6 + Math.random() * 8) + 'px';
+    s.style.height = (10 + Math.random() * 10) + 'px';
+    confettiLayer.appendChild(s);
+    setTimeout(() => s.remove(), 5200);
+  }
+}
+
+hub.addEventListener('click', spin);
+wheelWrap.addEventListener('click', (e) => {
+  if (e.target === hub) return;
+  spin();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.code === 'Space') {
+    e.preventDefault();
+    if (modal.classList.contains('show')) {
+      closeModal();
+    } else {
+      spin();
+    }
+  }
+});
+continueBtn.addEventListener('click', closeModal);
+
+countTotal.textContent = String(TOTAL);
+drawWheel();
+</script>
+
+</body>
+</html>
